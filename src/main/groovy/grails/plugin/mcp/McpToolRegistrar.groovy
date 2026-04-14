@@ -132,32 +132,23 @@ class McpToolRegistrar implements ApplicationListener<ContextRefreshedEvent> {
             endpoint = ctx.getEnvironment().getProperty('spring.ai.mcp.server.streamable-http.mcp-endpoint', '/mcp')
         } catch (ignored) {}
 
+        def line = '-' * 50
         println ''
-        println '╔══════════════════════════════════════════════════════════════╗'
-        println '║              Grails MCP Plugin — Ready                      ║'
-        println '╠══════════════════════════════════════════════════════════════╣'
-        println "║  Endpoint:  ${endpoint.padRight(48)}║"
-        println "║  Tools:     ${callbacks.length} registered".padRight(63) + '║'
-        println '╠══════════════════════════════════════════════════════════════╣'
+        println line
+        println '  Grails MCP Plugin - Ready'
+        println line
+        println "  Endpoint : ${endpoint}"
+        println "  Tools    : ${callbacks.length} registered"
+        println line
         if (pluginTools) {
-            println '║  Built-in tools:                                             ║'
-            pluginTools.each { name ->
-                println "║    - ${name.padRight(55)}║"
-            }
+            println '  Built-in tools:'
+            pluginTools.each { name -> println "    - ${name}" }
         }
         if (hostTools) {
-            println '║  Host app tools:                                             ║'
-            hostTools.each { name ->
-                println "║    - ${name.padRight(55)}║"
-            }
+            println '  Host app tools:'
+            hostTools.each { name -> println "    - ${name}" }
         }
-        println '╠══════════════════════════════════════════════════════════════╣'
-        println '║  Claude Code config (.mcp.json):                            ║'
-        println '║    { "mcpServers": { "grails": {                            ║'
-        println '║        "type": "http",                                      ║'
-        println "║        \"url\": \"http://localhost:<port>${endpoint}\"".padRight(63) + '║'
-        println '║    }}}                                                      ║'
-        println '╚══════════════════════════════════════════════════════════════╝'
+        println line
         println ''
     }
 
