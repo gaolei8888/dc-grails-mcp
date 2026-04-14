@@ -31,3 +31,11 @@
 
 # "temporary" build files
 /target
+docs/
+.claude/
+.gradle/
+.idea/
+build/
+META-INF/
+io/
+*.class

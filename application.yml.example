@@ -1,0 +1,57 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Grails MCP Plugin — Configuration for Host Application
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Copy the relevant sections below into your Grails app's application.yml.
+#
+# ── Installation ──────────────────────────────────────────────────────────────
+#
+# 1. Copy dc-grails-mcp-x.x.x-all.jar into your app's lib/ directory
+# 2. Add to your build.gradle:
+#      implementation fileTree(dir: 'lib', include: ['dc-grails-mcp-*.jar'])
+# 3. Add the config below to your application.yml
+# 4. Start your Grails app — MCP endpoint will be available at /mcp
+# 5. Configure Claude Code to connect (see below)
+#
+# ── Claude Code Configuration ────────────────────────────────────────────────
+#
+# Add to your project's .mcp.json:
+#
+#   {
+#     "mcpServers": {
+#       "grails": {
+#         "type": "http",
+#         "url": "http://localhost:8080/mcp"
+#       }
+#     }
+#   }
+#
+# Or add globally via CLI:
+#   claude mcp add grails --transport http http://localhost:8080/mcp
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+
+spring:
+    ai:
+        mcp:
+            server:
+                enabled: true
+                name: grails-mcp-server
+                version: 0.0.1
+                protocol: STREAMABLE
+                type: SYNC
+                instructions: "Grails application MCP server with domain introspection, Groovy execution, database access, and log reading."
+                annotation-scanner:
+                    enabled: true
+                streamable-http:
+                    mcp-endpoint: /mcp
+
+grails:
+    mcp:
+        readOnly: false
+        groovy:
+            timeoutSeconds: 30
+            maxOutputBytes: 524288
+        audit:
+            enabled: true
+        logFile: ""

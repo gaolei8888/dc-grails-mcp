@@ -1,0 +1,61 @@
+plugins {
+    id 'groovy'
+    id 'org.apache.grails.gradle.grails-plugin'
+    id 'maven-publish'
+}
+
+group   = 'com.dc'
+version = '0.0.1'
+description = 'Grails MCP Plugin — AI-native console for Claude Code'
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url "https://repo.grails.org/grails/restricted" }
+    maven {
+        url = 'https://repository.apache.org/content/groups/snapshots'
+        content {
+            includeVersionByRegex('org[.]apache[.](grails|groovy).*', '.*', '.*-SNAPSHOT')
+        }
+    }
+    maven {
+        url = 'https://repo.grails.org/grails/plugins'
+    }
+    maven { url = 'https://repo.spring.io/milestone' }
+}
+
+dependencies {
+    implementation platform("org.apache.grails:grails-bom:$grailsVersion")
+    implementation platform("org.springframework.ai:spring-ai-bom:1.1.4")
+
+    implementation "org.apache.grails:grails-core"
+    implementation "org.apache.grails:grails-web-boot"
+    implementation "org.apache.grails:grails-converters"
+    implementation "org.apache.groovy:groovy-sql"
+    implementation "org.apache.grails.data:grails-datamapping-core"
+    compileOnly 'jakarta.servlet:jakarta.servlet-api:6.0.0'
+
+    // Spring AI MCP Server (Streamable HTTP via WebMVC)
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
+
+    testImplementation 'org.apache.grails:grails-testing-support-datamapping'
+    testImplementation 'org.spockframework:spock-core'
+}
+
+bootJar.enabled = false
+
+tasks.withType(GroovyCompile).configureEach {
+    groovyOptions.fork = true
+    groovyOptions.forkOptions.memoryMaximumSize = project.findProperty('groovyMaxHeap') ?: '2g'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = 'dc-grails-mcp'
+            groupId = 'com.dc'
+            version = "${version}"
+            from components.java
+        }
+    }
+}
