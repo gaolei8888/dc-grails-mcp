@@ -1,88 +1,28 @@
 # dc-grails-mcp
 
-A Grails 7 plugin that adds a native MCP (Model Context Protocol) server to any Grails application, allowing Claude Code to connect directly via Streamable HTTP. No JWT, no Python bridge -- just direct MCP protocol over HTTP, powered by Spring AI MCP Server WebMVC.
+Add an MCP server to your Grails 7 app so Claude Code can query your domain model, execute Groovy, run SQL, and read logs -- all from the CLI.
 
-## Architecture
+## Requirements
 
-```
-Claude Code
-    |
-    | Streamable HTTP
-    v
- /mcp endpoint  (Spring AI MCP Server WebMVC)
-    |
-    v
- McpToolRegistrar  (auto-discovers @McpTool beans at ContextRefreshedEvent)
-    |
-    +---> GroovyExecutionTools  ---> GroovyExecutorService   (sandboxed Groovy REPL)
-    +---> DomainInspectionTools ---> DomainInspectorService   (GORM introspection)
-    +---> DatabaseTools         ---> DatabaseInspectorService  (JDBC operations)
-    +---> LogTools              ---> LogReaderService           (log file reading)
-    +---> AppInspectionTools    ---> AppInspectorService        (config/beans/health)
-    +---> [Host App Tools]      ---> [Host App Services]       (auto-discovered)
-    |
-    v
- McpAuditService  (audit logging for all tool invocations)
-```
+- Grails 7 (tested with 7.0.10)
+- Java 25 (tested)
 
-## Built-in Tools
+## Setup
 
-The plugin ships with 12 tools across 5 categories:
+### Step 1: Add the dependency
 
-### Groovy Execution
-
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `execute_groovy` | Execute a Groovy script in the live Grails context. All domain classes are pre-injected by short name (e.g. `User`), all services by property name (e.g. `userService`), and the Spring `ApplicationContext` is available as `ctx`. Non-transactional (read-safe). | `script` (required): Groovy script to execute |
-| `execute_groovy_transaction` | Execute a Groovy script inside a DB transaction. Set `dry_run=true` to execute then rollback -- safe preview of data changes. | `script` (required): Groovy script; `dryRun`: rollback after execution if true |
-
-### Domain Model Inspection
-
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `get_domain_model` | Get GORM domain class definitions including properties, types, constraints (nullable, blank, maxSize, minSize, inList, matches, unique, email, url), transients, and relationships. Without `className`, returns all domain classes. | `className`: filter by simple or full class name |
-| `get_domain_relationships` | Get the full relationship graph across all GORM domain classes -- hasMany, belongsTo, and hasOne for every class. | (none) |
-
-### Database
-
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `execute_sql` | Execute raw SQL against the application database via JDBC. SELECT only by default; write operations require `allowWrite=true`. Results capped at `maxRows`. | `sql` (required): SQL query; `allowWrite`: enable DML; `maxRows`: row limit (default 100, hard cap 500) |
-| `get_database_schema` | Get the actual database schema from JDBC metadata -- tables, columns, types, sizes, nullability, defaults, indexes, and foreign keys. Works with MySQL, PostgreSQL, Oracle, H2, and any JDBC datasource. | `table`: filter to a single table |
-| `analyze_database_issues` | Automated data quality and performance scanner. Checks for orphaned records, duplicate unique values, large tables (>100K rows), and missing FK indexes. Issues classified as HIGH/MEDIUM/LOW severity. | `focus`: `all`, `integrity`, `duplicates`, or `performance` |
-
-### Logs
-
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `get_logs` | Read recent application log lines with optional filtering by level (respects hierarchy -- WARN includes WARN and ERROR) and substring pattern. | `lines`: number of lines (default 100); `level`: ERROR, WARN, INFO, DEBUG, TRACE; `pattern`: substring filter |
-| `get_recent_exceptions` | Get recent exceptions from the log, grouped by type and message. Returns up to 20 exception types sorted by frequency with first/last occurrence timestamps. | `sinceMinutes`: lookback window (default 60) |
-
-### Application Inspection
-
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `get_app_config` | Get the resolved runtime configuration. Sensitive values (passwords, secrets, keys, tokens, credentials) are automatically redacted. | `prefix`: filter by config key prefix (e.g. `spring.datasource`) |
-| `get_spring_beans` | List all Spring beans in the ApplicationContext with name and type. | `filter`: name substring; `typeFilter`: type substring |
-| `get_app_health` | Get application health: Grails/Java/OS versions, memory usage (MB and %), thread count, processor count, and database connectivity status. | (none) |
-
-## Quick Start
-
-### 1. Build the plugin
+First, publish the plugin to your local Maven repo:
 
 ```bash
 cd dc-grails-mcp
 ./gradlew publishToMavenLocal
 ```
 
-### 2. Add the dependency to your host app
-
-In your host app's `build.gradle`, add `mavenLocal()` to repositories and the plugin as a dependency:
+Then add it to your app's `build.gradle`:
 
 ```groovy
 repositories {
     mavenLocal()
-    // ... your other repositories
 }
 
 dependencies {
@@ -90,9 +30,9 @@ dependencies {
 }
 ```
 
-### 3. Add MCP configuration to application.yml
+### Step 2: Configure `application.yml`
 
-Add the following to your host app's `grails-app/conf/application.yml`:
+Add this to your app's `grails-app/conf/application.yml`:
 
 ```yaml
 spring:
@@ -100,11 +40,10 @@ spring:
         mcp:
             server:
                 enabled: true
-                name: grails-mcp-server
+                name: my-app-mcp
                 version: 0.0.1
                 protocol: STREAMABLE
                 type: SYNC
-                instructions: "Grails application MCP server with domain introspection, Groovy execution, database access, and log reading."
                 annotation-scanner:
                     enabled: true
                 streamable-http:
@@ -112,15 +51,16 @@ spring:
 
 grails:
     mcp:
+        readOnly: false
         groovy:
             timeoutSeconds: 30
         audit:
             enabled: true
 ```
 
-### 4. Add `.mcp.json` to your project root
+### Step 3: Connect Claude Code
 
-Create `.mcp.json` in your host app's project root (adjust the port to match your app):
+Create `.mcp.json` in your project root:
 
 ```json
 {
@@ -133,192 +73,275 @@ Create `.mcp.json` in your host app's project root (adjust the port to match you
 }
 ```
 
-Or add globally via the Claude CLI:
+Change the port to match your app. Start your app, open Claude Code in the project -- done.
 
-```bash
-claude mcp add grails --transport http http://localhost:8080/mcp
+## What you get
+
+12 tools, ready to use:
+
+| Tool | What it does |
+|------|-------------|
+| `gr_groovy` | Run Groovy in your live app -- domain classes, services, ctx all available |
+| `gr_groovy_tx` | Same but in a transaction. Use `dryRun: true` to preview changes |
+| `gr_domains` | List all GORM domain classes with properties, types, constraints |
+| `gr_relationships` | Show hasMany/belongsTo/hasOne across all domains |
+| `gr_sql` | Run SQL queries. SELECT by default, DML with `allowWrite: true` |
+| `gr_schema` | Get table schemas -- columns, indexes, foreign keys |
+| `gr_db_analyze` | Scan for orphaned records, duplicates, missing indexes |
+| `gr_logs` | Read app logs with level/pattern filtering |
+| `gr_exceptions` | Recent exceptions grouped by type with counts |
+| `gr_config` | App config (secrets auto-redacted) |
+| `gr_beans` | List Spring beans by name or type |
+| `gr_health` | Memory, threads, DB status, versions |
+
+## Examples
+
+You ask questions in plain English. Claude figures out which tool to use and writes the Groovy/SQL for you.
+
+### Explore the data model
+
+```
+You: What domain classes does this app have?
+
+Claude calls gr_domains
+
+  Product: { name: String, price: BigDecimal, sku: String, active: Boolean, ... }
+  Order: { orderNumber: String, status: String, total: BigDecimal, ... }
+  Customer: { email: String, firstName: String, lastName: String, ... }
+  OrderItem: { quantity: Integer, unitPrice: BigDecimal, ... }
+  Category: { name: String, description: String, ... }
+  (18 domain classes total)
 ```
 
-### 5. Restart and connect
-
-Start (or restart) your Grails app. You should see the MCP Plugin banner in the console:
-
 ```
-╔══════════════════════════════════════════════════════════════╗
-║              Grails MCP Plugin — Ready                      ║
-╠══════════════════════════════════════════════════════════════╣
-║  Endpoint:  /mcp                                            ║
-║  Tools:     12 registered                                   ║
-╠══════════════════════════════════════════════════════════════╣
-║  Built-in tools:                                             ║
-║    - execute_groovy                                          ║
-║    - execute_groovy_transaction                              ║
-║    - get_domain_model                                        ║
-║    - ...                                                     ║
-╚══════════════════════════════════════════════════════════════╝
+You: How are orders connected to customers?
+
+Claude calls gr_relationships
+
+  Customer:
+    hasMany -> [orders: Order, addresses: Address]
+  Order:
+    belongsTo -> [customer: Customer]
+    hasMany -> [items: OrderItem, payments: Payment]
+  OrderItem:
+    belongsTo -> [order: Order]
 ```
 
-Claude Code will auto-discover the MCP server from `.mcp.json` when you open the project.
+### Ask questions about your data
 
-## Configuration Reference
+Claude writes the Groovy code — you just ask in plain English.
 
-### Spring AI MCP Server (`spring.ai.mcp.server.*`)
+```
+You: How many customers signed up this week?
 
-| Property | Default | Description |
-|----------|---------|-------------|
-| `enabled` | `false` | Enable the MCP server |
-| `name` | -- | Server name reported to MCP clients |
-| `version` | -- | Server version reported to MCP clients |
-| `protocol` | `STREAMABLE` | MCP transport protocol |
-| `type` | `SYNC` | Server type (SYNC or ASYNC) |
-| `instructions` | -- | Human-readable server description sent to MCP clients |
-| `annotation-scanner.enabled` | `true` | Enable scanning for `@McpTool` annotations |
-| `streamable-http.mcp-endpoint` | `/mcp` | HTTP endpoint path for MCP protocol |
+Claude calls gr_groovy
+  script: "Customer.countByDateCreatedGreaterThan(new Date() - 7)"
 
-### Grails MCP Plugin (`grails.mcp.*`)
+  Result: 89
+```
 
-| Property | Default | Description |
-|----------|---------|-------------|
-| `readOnly` | `false` | If `true`, disable all write operations |
-| `groovy.timeoutSeconds` | `30` | Maximum execution time for Groovy scripts |
-| `groovy.maxOutputBytes` | `524288` | Maximum output size (512KB) before truncation |
-| `audit.enabled` | `true` | Enable audit logging of MCP operations |
-| `logFile` | (auto-detected) | Path to the application log file. Auto-detects from `logs/<appName>.log`, `logs/application.log`, or `/var/log/app/application.log` |
+```
+You: Who are the top 5 customers by total spending?
 
-## Custom Tools
+Claude calls gr_groovy
+  script: """
+    Order.executeQuery(
+      'SELECT o.customer.email, SUM(o.total) as spent FROM Order o ' +
+      'GROUP BY o.customer.email ORDER BY spent DESC', [max: 5]
+    )
+  """
 
-Host applications can register their own MCP tools by creating any Spring bean with `@McpTool` annotated methods. The `McpToolRegistrar` auto-discovers them at startup.
+  Result:
+    [["alice@example.com", 4820.00],
+     ["bob@example.com", 3150.50],
+     ["carol@example.com", 2890.00], ...]
+```
 
-### Example: Adding a custom tool
+```
+You: Show me all orders stuck in PROCESSING for more than 2 days
 
-```groovy
-package com.myapp
+Claude calls gr_groovy
+  script: """
+    Order.findAllByStatusAndLastUpdatedLessThan('PROCESSING', new Date() - 2)
+      .collect { [id: it.id, orderNumber: it.orderNumber, customer: it.customer.email, lastUpdated: it.lastUpdated] }
+  """
 
-import org.springaicommunity.mcp.annotation.McpTool
-import org.springaicommunity.mcp.annotation.McpToolParam
-import org.springframework.stereotype.Component
+  Result:
+    [id: 501, orderNumber: "ORD-2026-501", customer: "dave@example.com", lastUpdated: "2026-04-10"]
+    [id: 487, orderNumber: "ORD-2026-487", customer: "eve@example.com", lastUpdated: "2026-04-09"]
+```
 
-@Component
-class TicketTools {
+```
+You: Any products with zero stock?
 
-    def ticketService  // auto-injected by Grails
+Claude calls gr_groovy
+  script: "Product.findAllByStockQuantity(0).collect { [id: it.id, name: it.name, sku: it.sku] }"
 
-    @McpTool(name = "search_tickets",
-             description = "Search support tickets by status and keyword")
-    String searchTickets(
-            @McpToolParam(description = "Ticket status: OPEN, CLOSED, PENDING", required = true)
-            String status,
-            @McpToolParam(description = "Search keyword for ticket subject/body")
-            String keyword) {
+  Result:
+    [id: 42, name: "Wireless Mouse", sku: "WM-001"]
+    [id: 78, name: "USB-C Hub", sku: "HUB-003"]
+```
 
-        def results = ticketService.search(status, keyword)
-        return groovy.json.JsonOutput.prettyPrint(
-            groovy.json.JsonOutput.toJson(results)
-        )
+### Database investigation
+
+```
+You: What does the order table look like?
+
+Claude calls gr_schema with { table: "order" }
+
+  columns: [id BIGINT PK, order_number VARCHAR(50), status VARCHAR(20),
+            total DECIMAL(19,2), customer_id BIGINT FK->customer, ...]
+  indexes: [idx_order_status (status), idx_order_customer (customer_id)]
+  foreignKeys: [customer_id -> customer.id]
+```
+
+```
+You: Are there any orphaned records?
+
+Claude calls gr_db_analyze with { focus: "integrity" }
+
+  HIGH: 5 orphaned order_item rows (order_id references deleted orders)
+  MEDIUM: 2 payment rows with null order_id
+```
+
+```
+You: How many orders per status?
+
+Claude calls gr_sql
+  sql: "SELECT status, COUNT(*) as cnt FROM `order` GROUP BY status ORDER BY cnt DESC"
+
+  Result:
+    DELIVERED:   1,247
+    SHIPPED:       183
+    PROCESSING:     41
+    CANCELLED:      28
+```
+
+### Safe data changes with preview
+
+The dry-run feature lets you see exactly what would change before committing.
+
+```
+You: Cancel all processing orders older than 30 days. Show me what would happen first.
+
+Claude calls gr_groovy_tx with { dryRun: true }
+  script: """
+    def stale = Order.findAllByStatusAndDateCreatedLessThan('PROCESSING', new Date() - 30)
+    stale.each { it.status = 'CANCELLED'; it.save() }
+    return [cancelled: stale.size(), orderNumbers: stale.collect { it.orderNumber }]
+  """
+
+  Result: { cancelled: 3, orderNumbers: ["ORD-2026-102", "ORD-2026-087", "ORD-2026-051"] }
+  (transaction rolled back - preview only)
+```
+
+```
+You: OK, go ahead
+
+Claude calls gr_groovy_tx with { dryRun: false }
+  (same script)
+
+  Result: { cancelled: 3 } (committed)
+```
+
+```
+You: Set all products in the "Clearance" category to 50% off, preview first
+
+Claude calls gr_groovy_tx with { dryRun: true }
+  script: """
+    def items = Product.findAllByCategory(Category.findByName('Clearance'))
+    items.each { it.price = it.price * 0.5; it.save() }
+    return items.collect { [name: it.name, oldPrice: it.price * 2, newPrice: it.price] }
+  """
+
+  Result:
+    [name: "Wireless Mouse", oldPrice: 29.99, newPrice: 14.99]
+    [name: "USB-C Hub", oldPrice: 49.99, newPrice: 24.99]
+  (rolled back)
+```
+
+### Debugging
+
+```
+You: Any errors recently?
+
+Claude calls gr_exceptions with { sinceMinutes: 60 }
+
+  NullPointerException (3 times) - "Cannot get property 'email' on null object"
+  TimeoutException (1 time) - "Connection timed out after 30000ms"
+```
+
+```
+You: Show me the null pointer errors
+
+Claude calls gr_logs with { level: "ERROR", pattern: "NullPointer", lines: 10 }
+
+  2026-04-14 08:45:00 ERROR - NullPointerException in OrderService.sendConfirmation
+  2026-04-14 08:32:00 ERROR - NullPointerException in OrderService.sendConfirmation
+  2026-04-14 08:12:00 ERROR - NullPointerException in OrderService.sendConfirmation
+```
+
+```
+You: Is the database connection healthy?
+
+Claude calls gr_health
+
+  memory: 456MB / 2048MB (22%)
+  threads: 42
+  database: UP (MySQL 8.0.35)
+```
+
+### Bulk operations
+
+```
+You: Deactivate all products that haven't been ordered in 6 months
+
+Claude calls gr_groovy_tx with { dryRun: true }
+  script: """
+    def cutoff = new Date() - 180
+    def stale = Product.executeQuery(
+      'FROM Product p WHERE p.active = true AND p.id NOT IN ' +
+      '(SELECT DISTINCT oi.product.id FROM OrderItem oi WHERE oi.dateCreated > :cutoff)',
+      [cutoff: cutoff])
+    stale.each { it.active = false; it.save() }
+    return "Deactivated ${stale.size()} products"
+  """
+
+  Result: "Deactivated 23 products" (rolled back)
+```
+
+```
+You: Merge duplicate customer records for alice@example.com
+
+Claude calls gr_groovy_tx with { dryRun: true }
+  script: """
+    def dupes = Customer.findAllByEmail('alice@example.com', [sort: 'dateCreated'])
+    if (dupes.size() < 2) return "No duplicates found"
+    def keep = dupes[0]
+    def remove = dupes[1..-1]
+    remove.each { dupe ->
+      Order.findAllByCustomer(dupe).each { it.customer = keep; it.save() }
+      dupe.delete()
     }
-}
+    return "Merged ${remove.size()} duplicates into Customer #${keep.id}"
+  """
+
+  Result: "Merged 1 duplicates into Customer #42" (rolled back)
 ```
 
-**Important:** The correct annotation import is:
+## Adding your own tools
 
-```groovy
-import org.springaicommunity.mcp.annotation.McpTool
-import org.springaicommunity.mcp.annotation.McpToolParam
-```
+The plugin auto-discovers any bean with `@Tool` annotations at startup. Just create a Grails service with `@Tool` methods and register the bean — it will show up alongside the built-in tools.
 
-Do **not** use `org.springframework.ai.mcp.annotation.McpTool` -- that path does not exist.
-
-### How auto-discovery works
-
-The `McpToolRegistrar` listens for the Spring `ContextRefreshedEvent` (which fires after all beans -- including late-binding Grails plugin beans -- are fully initialized). It then:
-
-1. Loads the plugin's own tool beans by name.
-2. Scans every bean in the `ApplicationContext` for methods annotated with `@McpTool`, walking up the class hierarchy to handle CGLIB/Grails proxies.
-3. Converts discovered `@McpTool` methods into `ToolCallback` objects via `MethodToolCallbackProvider`.
-4. Registers all tools with the `McpSyncServer` and calls `notifyToolsListChanged()`.
-
-This two-strategy approach ensures both plugin tools and host app tools are registered, regardless of when their beans were created in the lifecycle.
+See `application.yml.example` in this repo for a full configuration reference.
 
 ## Security
 
-### Groovy Sandbox
-
-The `GroovyExecutorService` runs user-provided scripts in a restricted sandbox:
-
-- **Blacklisted classes** -- the following are blocked from import and use:
-  - `java.lang.Runtime`, `java.lang.ProcessBuilder` (no shell commands)
-  - `java.io.File`, `java.io.FileInputStream`, `java.io.FileOutputStream` (no filesystem access)
-  - `java.lang.System` (no `System.exit()`, no env vars)
-  - `java.lang.Thread`, `java.lang.ClassLoader`, `groovy.lang.GroovyClassLoader` (no classloading or threading)
-  - `java.lang.reflect.Field` (no reflection)
-  - `java.net.URL`, `java.net.Socket` (no network access)
-- **Blocked syntax** -- `while` loops are disallowed at the AST level (prevents infinite loops)
-- **Execution timeout** -- configurable, default 30 seconds
-- **Output cap** -- results truncated at 512KB
-- **Dry-run mode** -- `execute_groovy_transaction` with `dryRun=true` executes then rolls back the transaction
-
-### SQL Write Protection
-
-`execute_sql` blocks INSERT, UPDATE, DELETE, DROP, ALTER, and TRUNCATE statements unless the caller explicitly passes `allowWrite=true`.
-
-### Sensitive Config Redaction
-
-`get_app_config` automatically redacts values for any config key containing: `password`, `secret`, `key`, `token`, `credential`, `private`, `apikey`, `api_key`, `auth`, `jwt`.
-
-### Audit Logging
-
-Every `execute_groovy`, `execute_groovy_transaction`, and `execute_sql` call is recorded by `McpAuditService` to a dedicated audit logger (`grails.plugin.mcp.audit`). Payloads are truncated to 500 characters. Configure a dedicated log appender in your `logback.xml`:
-
-```xml
-<appender name="MCP_AUDIT" class="ch.qos.logback.core.rolling.RollingFileAppender">
-    <file>logs/mcp-audit.log</file>
-    <!-- ... rolling policy ... -->
-</appender>
-<logger name="grails.plugin.mcp.audit" level="INFO" additivity="false">
-    <appender-ref ref="MCP_AUDIT"/>
-</logger>
-```
-
-## Tech Stack
-
-| Component | Version |
-|-----------|---------|
-| Grails | 7.0.10 |
-| Spring AI BOM | 1.1.4 |
-| Spring Boot | 3.5.x |
-| MCP Transport | Streamable HTTP (`spring-ai-starter-mcp-server-webmvc`) |
-| Build | Gradle with `grails-gradle-plugins` |
-| Language | Groovy (compiled with `@CompileDynamic`) |
-
-## Project Structure
-
-```
-dc-grails-mcp/
-  build.gradle                          # Plugin build, dependencies, publishing
-  gradle.properties                     # Grails version, JVM settings
-  settings.gradle                       # Plugin management, repositories
-  application.yml.example               # Configuration reference for host apps
-  META-INF/
-    grails-plugin.xml                   # Grails plugin descriptor
-    MANIFEST.MF                         # JAR manifest
-  src/main/groovy/grails/plugin/mcp/
-    GrailsMcpGrailsPlugin.groovy        # Plugin descriptor — registers beans via doWithSpring()
-    McpToolRegistrar.groovy             # ContextRefreshedEvent listener — auto-discovers @McpTool beans
-    tools/
-      GroovyExecutionTools.groovy       # execute_groovy, execute_groovy_transaction
-      DomainInspectionTools.groovy      # get_domain_model, get_domain_relationships
-      DatabaseTools.groovy              # execute_sql, get_database_schema, analyze_database_issues
-      LogTools.groovy                   # get_logs, get_recent_exceptions
-      AppInspectionTools.groovy         # get_app_config, get_spring_beans, get_app_health
-  grails-app/services/grails/plugin/mcp/
-    GroovyExecutorService.groovy        # Sandboxed Groovy script execution
-    DomainInspectorService.groovy       # GORM domain class introspection
-    DatabaseInspectorService.groovy     # JDBC schema, SQL execution, data quality analysis
-    LogReaderService.groovy             # Log file reading and exception grouping
-    AppInspectorService.groovy          # Runtime config, Spring beans, health metrics
-    McpAuditService.groovy              # Audit logging for MCP operations
-```
+- Groovy scripts run in a sandbox — dangerous classes blocked, 30s timeout, 512KB output cap
+- SQL write operations blocked by default — must explicitly enable with `allowWrite: true`
+- Config values containing passwords/secrets/keys/tokens are auto-redacted
+- All tool calls are audit-logged
 
 ## License
 
-Apache 2.0
+MIT

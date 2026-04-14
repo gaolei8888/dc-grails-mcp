@@ -10,7 +10,7 @@ class GrailsMcpGrailsPlugin extends Plugin {
     def authorEmail = 'gaolei8888@yahoo.com'
     def description = 'AI-native MCP server for Claude Code — exposes Groovy execution, domain model, database, and logs via Streamable HTTP MCP protocol.'
     def documentation = 'https://github.com/nicetool/dc-grails-mcp'  // update to your repo URL
-    def license = 'APACHE'
+    def license = 'MIT'
 
     Closure doWithSpring() { { ->
         // Register MCP tool beans
