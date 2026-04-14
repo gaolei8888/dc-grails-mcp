@@ -14,7 +14,7 @@ class AppInspectionTools {
     @Autowired
     AppInspectorService appInspectorService
 
-    @Tool(name = "get_app_config",
+    @Tool(name = "gr_config",
              description = """Get the resolved runtime application configuration.
 Returns flattened key-value properties from the running Grails app. Sensitive values (passwords, secrets, keys, tokens, credentials) are automatically redacted.
 Use the prefix parameter to filter to a specific config section.""")
@@ -26,7 +26,7 @@ Use the prefix parameter to filter to a specific config section.""")
         return groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(result))
     }
 
-    @Tool(name = "get_spring_beans",
+    @Tool(name = "gr_beans",
              description = """List all Spring beans registered in the ApplicationContext.
 Returns bean name and fully-qualified class type. Supports filtering by bean name or type.""")
     String getSpringBeans(
@@ -39,7 +39,7 @@ Returns bean name and fully-qualified class type. Supports filtering by bean nam
         return groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(result))
     }
 
-    @Tool(name = "get_app_health",
+    @Tool(name = "gr_health",
              description = """Get application health metrics.
 Returns: Grails version, app name, Java version/vendor, OS info, memory usage (used/total/max MB with percentage), active thread count, available processors, and database connectivity status (product, version, sanitized URL).""")
     String appHealth() {

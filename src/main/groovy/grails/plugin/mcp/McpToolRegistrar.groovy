@@ -116,15 +116,7 @@ class McpToolRegistrar implements ApplicationListener<ContextRefreshedEvent> {
             def spec = McpToolUtils.toSyncToolSpecification(callback)
             mcpServer.addTool(spec)
             def toolName = callback.toolDefinition?.name() ?: callback.name ?: 'unknown'
-            if (callback.toolDefinition?.name()?.startsWith('execute_groovy') ||
-                callback.toolDefinition?.name()?.startsWith('get_domain') ||
-                callback.toolDefinition?.name()?.startsWith('execute_sql') ||
-                callback.toolDefinition?.name()?.startsWith('get_database') ||
-                callback.toolDefinition?.name()?.startsWith('analyze_database') ||
-                callback.toolDefinition?.name()?.startsWith('get_logs') ||
-                callback.toolDefinition?.name()?.startsWith('get_recent') ||
-                callback.toolDefinition?.name()?.startsWith('get_app') ||
-                callback.toolDefinition?.name()?.startsWith('get_spring')) {
+            if (toolName.startsWith('gr_')) {
                 pluginTools << toolName
             } else {
                 hostTools << toolName

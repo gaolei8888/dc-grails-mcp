@@ -18,7 +18,7 @@ class DatabaseTools {
     @Autowired
     McpAuditService mcpAuditService
 
-    @Tool(name = "execute_sql",
+    @Tool(name = "gr_sql",
              description = """Execute a raw SQL query against the application database via JDBC.
 SELECT queries run by default. For INSERT/UPDATE/DELETE/DROP/ALTER/TRUNCATE, set allow_write=true.
 Results are capped at max_rows (hard limit: 500).
@@ -38,7 +38,7 @@ Returns columns, rows, rowCount for SELECT; rowsAffected for DML.""")
         return groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(result))
     }
 
-    @Tool(name = "get_database_schema",
+    @Tool(name = "gr_schema",
              description = """Get the actual database schema from JDBC metadata.
 Returns tables with: column names/types/sizes/nullability/defaults, indexes (with uniqueness and column lists), and foreign keys (with referenced table/column).
 Works with MySQL, PostgreSQL, Oracle, H2, and any JDBC datasource.""")
@@ -50,7 +50,7 @@ Works with MySQL, PostgreSQL, Oracle, H2, and any JDBC datasource.""")
         return groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(result))
     }
 
-    @Tool(name = "analyze_database_issues",
+    @Tool(name = "gr_db_analyze",
              description = """Automated data quality and performance scanner.
 Checks for:
 - integrity: orphaned records (belongsTo FK with no parent row)

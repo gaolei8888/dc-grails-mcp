@@ -14,7 +14,7 @@ class LogTools {
     @Autowired
     LogReaderService logReaderService
 
-    @Tool(name = "get_logs",
+    @Tool(name = "gr_logs",
              description = """Read recent application log lines with optional filtering.
 Reads from the configured log file (grails.mcp.logFile) or common Grails log locations.
 Supports filtering by log level (respects level hierarchy — e.g. WARN includes WARN and ERROR) and by substring pattern.""")
@@ -31,7 +31,7 @@ Supports filtering by log level (respects level hierarchy — e.g. WARN includes
         return groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(result))
     }
 
-    @Tool(name = "get_recent_exceptions",
+    @Tool(name = "gr_exceptions",
              description = """Get recent exceptions from the application log, grouped by type and message.
 Scans ERROR-level log lines, extracts exception class names and messages, groups by type, counts occurrences, and tracks first/last occurrence timestamps. Returns up to 20 exception types sorted by frequency.""")
     String getRecentExceptions(

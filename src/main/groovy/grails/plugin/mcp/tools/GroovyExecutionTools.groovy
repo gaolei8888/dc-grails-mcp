@@ -18,7 +18,7 @@ class GroovyExecutionTools {
     @Autowired
     McpAuditService mcpAuditService
 
-    @Tool(name = "execute_groovy",
+    @Tool(name = "gr_groovy",
              description = """Execute a Groovy script in the live Grails application context.
 All domain classes are pre-injected by short name (e.g. User, Order).
 All services are pre-injected by property name (e.g. userService).
@@ -35,7 +35,7 @@ Output is capped at 512KB. Non-transactional (read-safe).""")
         return groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(result))
     }
 
-    @Tool(name = "execute_groovy_transaction",
+    @Tool(name = "gr_groovy_tx",
              description = """Execute a Groovy script inside a database transaction.
 Same context as execute_groovy but wrapped in a DB transaction.
 Set dry_run=true to execute then rollback — safe preview of data changes.
