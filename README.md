@@ -2,6 +2,18 @@
 
 Add an MCP server to your Grails 7 app so Claude Code can query your domain model, execute Groovy, run SQL, and read logs -- all from the CLI.
 
+## What is this?
+
+dc-grails-mcp is a Grails plugin that lets Claude Code talk directly to your running Grails application. Once installed, you can ask Claude questions about your app in plain English -- it will inspect your domain model, query your database, run Groovy scripts in your live app context, and read your logs. All from the Claude Code CLI without writing a single line of code yourself.
+
+**What you can do:**
+- "What domain classes does this app have?" -- Claude inspects your GORM model
+- "How many orders are stuck in PROCESSING?" -- Claude writes and runs the Groovy query for you
+- "Any errors in the last hour?" -- Claude reads your logs and groups exceptions
+- "Cancel all stale orders -- preview first" -- Claude runs a transaction with dry-run, you review, then commit
+
+The plugin exposes 12 built-in tools and auto-discovers any custom tools you add. It works over the MCP (Model Context Protocol) standard, connecting via HTTP -- no external processes, no Python, no tokens to manage.
+
 ## Requirements
 
 - Grails 7 (tested with 7.0.10)
