@@ -38,6 +38,10 @@ dependencies {
     // Spring AI MCP Server (Streamable HTTP via WebMVC)
     implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
 
+    // Optional OAuth2 security — activated by grails.mcp.security.enabled=true in host app
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+
     testImplementation 'org.apache.grails:grails-testing-support-datamapping'
     testImplementation 'org.spockframework:spock-core'
 }

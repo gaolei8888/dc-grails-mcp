@@ -55,3 +55,34 @@ grails:
         audit:
             enabled: true
         logFile: ""
+
+# ─── Optional: OAuth2 Security ─────────────────────────────────────────
+# By default, /mcp endpoint has NO authentication.
+# To enable OAuth2 JWT authentication, set the flag below and configure
+# your OAuth2 provider's issuer URI.
+#
+# Works with any OIDC-compliant provider: Keycloak, Auth0, Okta, Azure AD, etc.
+#
+# grails:
+#     mcp:
+#         security:
+#             enabled: true
+#
+# spring:
+#     security:
+#         oauth2:
+#             resourceserver:
+#                 jwt:
+#                     issuer-uri: https://your-auth-server/realms/your-realm
+#
+# Claude Code client (.mcp.json) — pass the token via headers:
+#
+#   {
+#     "mcpServers": {
+#       "grails": {
+#         "type": "http",
+#         "url": "http://localhost:8080/mcp",
+#         "headers": { "Authorization": "Bearer ${MCP_TOKEN}" }
+#       }
+#     }
+#   }
