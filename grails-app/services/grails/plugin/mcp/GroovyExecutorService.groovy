@@ -4,7 +4,10 @@ import grails.gorm.transactions.Transactional
 import groovy.transform.CompileDynamic
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.SecureASTCustomizer
+import org.codehaus.groovy.syntax.Types
 import org.springframework.context.ApplicationContext
+
+import java.util.regex.Pattern
 
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
@@ -31,7 +34,7 @@ class GroovyExecutorService {
     def grailsApplication
 
     private static final int DEFAULT_TIMEOUT_SECONDS = 30
-    private static final int MAX_OUTPUT_BYTES        = 512 * 1024 // 512KB
+    private static final int DEFAULT_MAX_OUTPUT_BYTES = 512 * 1024 // 512KB
 
     // Classes the sandbox forbids scripts from using
     private static final List<String> BLACKLISTED_CLASSES = [
@@ -48,6 +51,24 @@ class GroovyExecutorService {
         'java.net.URL',
         'java.net.Socket',
     ]
+
+    // Packages blocked from star imports (e.g. import java.nio.file.*)
+    private static final List<String> BLACKLISTED_STAR_IMPORT_PACKAGES = [
+        'java.lang.Runtime', 'java.lang.ProcessBuilder',
+        'java.io', 'java.nio.file', 'java.net',
+        'javax.script', 'groovy.lang',
+    ]
+
+    // Methods blocked at the AST level
+    private static final List<String> BLACKLISTED_RECEIVERS_METHODS = [
+        'java.lang.System.exit',
+        'java.lang.Runtime.exec',
+        'java.lang.ProcessBuilder.start',
+    ]
+
+    // Pattern for sensitive config/env keys
+    private static final Pattern SENSITIVE_KEY_PATTERN =
+        Pattern.compile('(?i)(password|secret|key|token|credential)')
 
     /**
      * Execute a Groovy script (non-transactional, read-safe).
@@ -119,7 +140,11 @@ class GroovyExecutorService {
         // Build sandbox compiler config
         def secure = new SecureASTCustomizer()
         secure.disallowedImports = BLACKLISTED_CLASSES
-        secure.disallowedTokens  = [org.codehaus.groovy.syntax.Types.KEYWORD_WHILE] // prevent infinite loops
+        secure.disallowedStarImports = BLACKLISTED_STAR_IMPORT_PACKAGES
+        secure.disallowedReceiversClasses = [Runtime, ProcessBuilder, System]
+        secure.disallowedTokens  = [Types.KEYWORD_WHILE] // prevent infinite loops
+        // Block Groovy's String.execute() shell shortcut
+        secure.disallowedStaticStarImports = ['java.lang.Runtime', 'java.lang.ProcessBuilder']
 
         def config = new CompilerConfiguration()
         config.addCompilationCustomizers(secure)
@@ -145,15 +170,21 @@ class GroovyExecutorService {
 
         def shell = new GroovyShell(this.class.classLoader, binding, config)
 
+        int maxOutputBytes = grailsApplication.config
+            .getProperty('grails.mcp.groovy.maxOutputBytes', Integer, DEFAULT_MAX_OUTPUT_BYTES)
+
         try {
             def rawResult = shell.evaluate(script)
             def formatted = formatResult(rawResult)
             def resultStr = formatted instanceof String ? formatted : groovy.json.JsonOutput.toJson(formatted)
 
             // Cap output size
-            if (resultStr.length() > MAX_OUTPUT_BYTES) {
-                resultStr = resultStr.substring(0, MAX_OUTPUT_BYTES) + "\n... [truncated at ${MAX_OUTPUT_BYTES} bytes]"
+            if (resultStr.length() > maxOutputBytes) {
+                resultStr = resultStr.substring(0, maxOutputBytes) + "\n... [truncated at ${maxOutputBytes} bytes]"
             }
+
+            // Redact sensitive values before returning
+            resultStr = redactSensitiveOutput(resultStr)
 
             return [
                 success    : true,
@@ -172,6 +203,20 @@ class GroovyExecutorService {
                     .collect { it.toString() },
             ]
         }
+    }
+
+    /**
+     * Redacts values associated with sensitive config/env keys in output strings.
+     * Matches patterns like: password=secret123, "token":"abc", key: xyz
+     */
+    private String redactSensitiveOutput(String output) {
+        if (!output) return output
+        // Redact key=value, key:value, "key":"value" patterns where key contains sensitive words
+        output = output.replaceAll(
+            '(?i)(["\']?\\w*(?:password|secret|key|token|credential)\\w*["\']?)\\s*[:=]\\s*(["\']?)([^"\'\\s,}\\]]+)\\2',
+            '$1=$2[REDACTED]$2'
+        )
+        return output
     }
 
     private Object formatResult(Object result) {

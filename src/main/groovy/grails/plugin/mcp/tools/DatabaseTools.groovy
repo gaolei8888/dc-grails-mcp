@@ -1,5 +1,6 @@
 package grails.plugin.mcp.tools
 
+import grails.core.GrailsApplication
 import grails.plugin.mcp.DatabaseInspectorService
 import grails.plugin.mcp.McpAuditService
 import groovy.transform.CompileDynamic
@@ -12,11 +13,25 @@ import org.springframework.stereotype.Component
 @CompileDynamic
 class DatabaseTools {
 
+    private static final List<String> WRITE_KEYWORDS = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'TRUNCATE', 'MERGE', 'REPLACE', 'GRANT', 'REVOKE']
+
+    @Autowired
+    GrailsApplication grailsApplication
+
     @Autowired
     DatabaseInspectorService databaseInspectorService
 
     @Autowired
     McpAuditService mcpAuditService
+
+    private boolean isReadOnly() {
+        grailsApplication.config.getProperty('grails.mcp.readOnly', Boolean, false)
+    }
+
+    private boolean isWriteSql(String sql) {
+        String trimmed = sql?.trim()?.toUpperCase() ?: ''
+        WRITE_KEYWORDS.any { trimmed.startsWith(it) }
+    }
 
     @Tool(name = "gr_sql",
              description = """Execute a raw SQL query against the application database via JDBC.
@@ -31,6 +46,10 @@ Returns columns, rows, rowCount for SELECT; rowsAffected for DML.""")
             @ToolParam(description = "Maximum rows to return for SELECT queries (default 100, hard cap 500)")
             Integer maxRows) {
 
+        if (isReadOnly() && isWriteSql(sql)) {
+            mcpAuditService.log('mcp-client', 'execute_sql', [sql: sql, allowWrite: allowWrite], false)
+            return groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([error: 'Write SQL is blocked when grails.mcp.readOnly=true. Only SELECT queries are allowed.']))
+        }
         boolean isWrite = allowWrite ?: false
         int rows = maxRows ?: 100
         mcpAuditService.log('mcp-client', 'execute_sql', [sql: sql, allowWrite: isWrite])
@@ -46,6 +65,7 @@ Works with MySQL, PostgreSQL, Oracle, H2, and any JDBC datasource.""")
             @ToolParam(description = "Optional: filter to a single table name")
             String table) {
 
+        mcpAuditService.log('mcp-client', 'get_database_schema', [table: table ?: 'all'])
         def result = databaseInspectorService.getSchema(table ?: null)
         return groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(result))
     }
@@ -61,6 +81,7 @@ Issues are classified as HIGH/MEDIUM/LOW severity.""")
             @ToolParam(description = "Which analysis categories to run: 'all', 'integrity', 'duplicates', or 'performance' (default: all)")
             String focus) {
 
+        mcpAuditService.log('mcp-client', 'analyze_database_issues', [focus: focus ?: 'all'])
         def result = databaseInspectorService.analyzeIssues(focus ?: 'all')
         return groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(result))
     }

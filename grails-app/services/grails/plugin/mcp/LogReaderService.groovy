@@ -138,12 +138,56 @@ class LogReaderService {
     }
 
     private List<String> readTailLines(File file, int maxLines) {
-        // Efficient tail — read last N lines without loading entire file
-        def lines = []
-        file.withReader('UTF-8') { reader ->
-            reader.eachLine { line -> lines << line }
+        // Reverse-read from end of file using RandomAccessFile to avoid OOM on large files.
+        // Reads in chunks and decodes as UTF-8 for correctness with multi-byte characters.
+        long fileLength = file.length()
+        if (fileLength == 0) return []
+
+        int chunkSize = 8192
+        def raf = new RandomAccessFile(file, 'r')
+        try {
+            long readEnd = fileLength
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream()
+
+            while (readEnd > 0) {
+                long readStart = Math.max(readEnd - chunkSize, 0)
+                int bytesToRead = (int) (readEnd - readStart)
+                raf.seek(readStart)
+                byte[] chunk = new byte[bytesToRead]
+                raf.readFully(chunk)
+
+                // Prepend chunk to buffer
+                ByteArrayOutputStream newBuffer = new ByteArrayOutputStream()
+                newBuffer.write(chunk)
+                newBuffer.write(buffer.toByteArray())
+                buffer = newBuffer
+
+                // Count newlines to see if we have enough lines
+                int lineCount = 0
+                byte[] accumulated = buffer.toByteArray()
+                for (int i = 0; i < accumulated.length; i++) {
+                    if (accumulated[i] == (byte) '\n') lineCount++
+                }
+                // We need maxLines newlines (plus possible partial first line)
+                if (lineCount >= maxLines + 1) break
+
+                readEnd = readStart
+            }
+
+            // Decode the accumulated bytes as UTF-8 and split into lines
+            String text = new String(buffer.toByteArray(), 'UTF-8')
+            def lines = text.split('\n', -1) as List<String>
+
+            // Remove trailing empty element from trailing newline
+            if (lines && lines[-1] == '') {
+                lines = lines[0..-2]
+            }
+
+            // Return only the last maxLines
+            return lines.size() > maxLines ? lines[-maxLines..-1] : lines
+        } finally {
+            raf.close()
         }
-        return lines.size() > maxLines ? lines[-maxLines..-1] : lines
     }
 
     private String extractTimestamp(String line) {

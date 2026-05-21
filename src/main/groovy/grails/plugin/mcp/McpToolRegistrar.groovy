@@ -44,9 +44,7 @@ class McpToolRegistrar implements ApplicationListener<ContextRefreshedEvent> {
         knownToolBeans.each { name ->
             try {
                 toolBeans << ctx.getBean(name)
-                println "Grails MCP Plugin: Found plugin tool bean '${name}'"
-            } catch (Exception e) {
-                println "Grails MCP Plugin: Plugin bean '${name}' not found: ${e.message}"
+            } catch (Exception ignored) {
             }
         }
 
@@ -61,7 +59,6 @@ class McpToolRegistrar implements ApplicationListener<ContextRefreshedEvent> {
                 Class clazz = Class.forName(className, false, Thread.currentThread().contextClassLoader)
                 if (hasToolMethodsOnClass(clazz)) {
                     toolBeans << ctx.getBean(beanName)
-                    println "Grails MCP Plugin: Found host app tool bean '${beanName}'"
                 }
             } catch (Exception ignored) {}
         }
@@ -71,30 +68,6 @@ class McpToolRegistrar implements ApplicationListener<ContextRefreshedEvent> {
             return
         }
 
-        println "Grails MCP Plugin: Registering tools from ${toolBeans.size()} bean(s)..."
-
-        // Debug: check what MethodToolCallbackProvider sees
-        toolBeans.each { bean ->
-            println "Grails MCP Plugin: DEBUG bean class: ${bean.getClass().name}"
-            bean.getClass().declaredMethods.each { m ->
-                def annotations = m.annotations.collect { it.annotationType().simpleName }
-                if (annotations) {
-                    println "Grails MCP Plugin: DEBUG   method ${m.name} annotations: ${annotations}"
-                }
-            }
-            // Also check superclass
-            def superClass = bean.getClass().superclass
-            if (superClass && superClass != Object) {
-                println "Grails MCP Plugin: DEBUG superclass: ${superClass.name}"
-                superClass.declaredMethods.each { m ->
-                    def annotations = m.annotations.collect { it.annotationType().simpleName }
-                    if (annotations) {
-                        println "Grails MCP Plugin: DEBUG   super method ${m.name} annotations: ${annotations}"
-                    }
-                }
-            }
-        }
-
         // Convert @McpTool annotated methods to ToolCallbacks
         ToolCallback[] callbacks
         try {
@@ -102,7 +75,6 @@ class McpToolRegistrar implements ApplicationListener<ContextRefreshedEvent> {
                 .toolObjects(toolBeans.toArray())
                 .build()
                 .getToolCallbacks()
-            println "Grails MCP Plugin: MethodToolCallbackProvider returned ${callbacks.length} callbacks"
         } catch (Exception e) {
             println "Grails MCP Plugin: ERROR from MethodToolCallbackProvider: ${e.message}"
             e.printStackTrace()
@@ -132,22 +104,12 @@ class McpToolRegistrar implements ApplicationListener<ContextRefreshedEvent> {
             endpoint = ctx.getEnvironment().getProperty('spring.ai.mcp.server.streamable-http.mcp-endpoint', '/mcp')
         } catch (ignored) {}
 
+        def allTools = (pluginTools + hostTools).join(', ')
         def line = '-' * 50
         println ''
         println line
-        println '  Grails MCP Plugin - Ready'
-        println line
-        println "  Endpoint : ${endpoint}"
-        println "  Tools    : ${callbacks.length} registered"
-        println line
-        if (pluginTools) {
-            println '  Built-in tools:'
-            pluginTools.each { name -> println "    - ${name}" }
-        }
-        if (hostTools) {
-            println '  Host app tools:'
-            hostTools.each { name -> println "    - ${name}" }
-        }
+        println "  Grails MCP Plugin  |  ${endpoint}  |  ${callbacks.length} tools"
+        println "  ${allTools}"
         println line
         println ''
     }

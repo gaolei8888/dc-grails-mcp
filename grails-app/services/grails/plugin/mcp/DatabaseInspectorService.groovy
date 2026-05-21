@@ -170,7 +170,13 @@ class DatabaseInspectorService {
         def sqlClient = new Sql(dataSource)
 
         try {
-            def dbType = detectDbType(dataSource.connection.metaData)
+            def conn = dataSource.connection
+            def dbType
+            try {
+                dbType = detectDbType(conn.metaData)
+            } finally {
+                conn.close()
+            }
 
             // ── Integrity checks ─────────────────────────────────────────────
             if (focus in ['all', 'integrity']) {
