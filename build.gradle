@@ -5,7 +5,7 @@ plugins {
 }
 
 group   = 'com.dc'
-version = '0.0.2'
+version = '0.0.3'
 description = 'Grails MCP Plugin — AI-native console for Claude Code'
 
 repositories {
